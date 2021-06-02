@@ -89,7 +89,7 @@ func TestDecode(t *testing.T) {
             t.Error("read data error ", err)
         } else {
             t.Log(buf)
-            e, decodeErr := Decode(buf)
+            e, decodeErr := DecodeEntryHeader(buf)
             if decodeErr != nil {
                 t.Error("decode data error ", decodeErr)
             } else {

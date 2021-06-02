@@ -3,6 +3,7 @@ package storage
 import (
     "errors"
     "fmt"
+    "hash/crc32"
     "os"
 )
 
@@ -50,4 +51,59 @@ func NewDBFile(path string, fileId uint32, method FileRWMethod, blockSize int64)
     }
 
     return df, nil
+}
+
+func (df *DBFile) readBuf(offset int64, n int64) ([]byte, error) {
+    buf := make([]byte, n)
+    if df.method == FileIO {
+        _, err := df.File.ReadAt(buf, offset)
+        if err != nil {
+            return nil, err
+        }
+    }
+
+    return buf, nil
+}
+
+func (df *DBFile) Read(offset int64) (e *Entry, err error) {
+    var buf []byte
+    if buf, err = df.readBuf(offset, entryHeaderSize); err != nil {
+        return
+    }
+    if e, err = DecodeEntryHeader(buf); err != nil {
+        return
+    }
+
+    offset += entryHeaderSize
+    if e.Meta.KeySize > 0 {
+        var key []byte
+        if key, err = df.readBuf(offset, int64(e.Meta.KeySize)); err != nil {
+            return
+        }
+        e.Meta.Key = key
+    }
+
+    offset += int64(e.Meta.KeySize)
+    if e.Meta.ValueSize > 0 {
+        var val []byte
+        if val, err = df.readBuf(offset, int64(e.Meta.ValueSize)); err != nil {
+            return
+        }
+        e.Meta.Value = val
+    }
+
+    offset += int64(e.Meta.ValueSize)
+    if e.Meta.ExtraSize > 0 {
+        var extra []byte
+        if extra, err = df.readBuf(offset, int64(e.Meta.ExtraSize)); err != nil {
+            return
+        }
+        e.Meta.Extra = extra
+    }
+    checkCrc := crc32.ChecksumIEEE(e.Meta.Value)
+    if checkCrc != e.crc32 {
+        return nil, ErrInvalidEntry
+    }
+
+    return e, nil
 }

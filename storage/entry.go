@@ -88,8 +88,8 @@ func (e *Entry) Encode() ([]byte, error) {
 }
 
 
-// Decode 解码字节数组，返回Entry
-func Decode(buf []byte) (*Entry, error) {
+// DecodeEntryHeader 解码字节数组，返回Entry
+func DecodeEntryHeader(buf []byte) (*Entry, error) {
     ks := binary.BigEndian.Uint32(buf[4:8])
     vs := binary.BigEndian.Uint32(buf[8:12])
     es := binary.BigEndian.Uint32(buf[12:16])
