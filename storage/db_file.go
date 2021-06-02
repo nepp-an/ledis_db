@@ -4,7 +4,11 @@ import (
     "errors"
     "fmt"
     "hash/crc32"
+    "io/ioutil"
     "os"
+    "sort"
+    "strconv"
+    "strings"
 )
 
 const (
@@ -106,4 +110,78 @@ func (df *DBFile) Read(offset int64) (e *Entry, err error) {
     }
 
     return e, nil
+}
+
+func (df *DBFile) Write(e *Entry) error {
+    if e == nil || e.Meta.KeySize == 0 {
+        return ErrEmptyEntry
+    }
+
+    method := df.method
+    writeOffSet := df.Offset
+    if encodeVal, err := e.Encode(); err != nil {
+        return err
+    } else {
+        if method == FileIO {
+            if _, err := df.File.WriteAt(encodeVal, writeOffSet); err != nil {
+                return err
+            }
+        }
+    }
+
+    df.Offset += int64(e.Size())
+    return nil
+}
+
+func (df *DBFile) Close(sync bool) (err error) {
+    if sync {
+        err = df.Sync()
+    }
+    if df.File != nil {
+        err = df.File.Close()
+    }
+    return
+}
+
+// sync in-memory content into disk
+func (df *DBFile) Sync() error {
+    if df.File != nil {
+        return df.File.Sync()
+    }
+    return nil
+}
+
+func Build(path string, method FileRWMethod, blockSize int64) (map[uint32]*DBFile, uint32, error) {
+    dir, err := ioutil.ReadDir(path)
+    if err != nil {
+        return nil, 0, err
+    }
+
+    var fileIds []int
+    for _, file := range dir {
+        if strings.HasPrefix(file.Name(), "data") {
+            splitNames := strings.Split(file.Name(), ".")
+            id, _ := strconv.Atoi(splitNames[0])
+            fileIds = append(fileIds, id)
+        }
+    }
+
+    sort.Ints(fileIds)
+    var activeFileId uint32 = 0    //最后一个为active
+    archFiles := make(map[uint32]*DBFile)
+    if len(fileIds) > 0 {
+        activeFileId = uint32(fileIds[len(fileIds)-1])
+    }
+
+    for i:=0;i<len(fileIds)-1;i++ {
+        id := fileIds[i]
+        file, err := NewDBFile(path, uint32(id), method, blockSize)
+        if err != nil {
+            return nil, activeFileId, err
+        }
+        archFiles[uint32(id)] = file
+    }
+
+    return archFiles, activeFileId, nil
+
 }
