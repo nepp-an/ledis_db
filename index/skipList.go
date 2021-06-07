@@ -24,8 +24,8 @@ type skipListNode struct {
 }
 
 type skipList struct {
-    head   *skipListNode
-    tail   *skipListNode
+    head   *skipListNode  //左上节点
+    tail   *skipListNode  //右上节点
     size   int
     levels int
 }
