@@ -30,7 +30,7 @@ type skipList struct {
     levels int
 }
 
-func NewSkipList() *skipList {
+func NewSkipList_() *skipList {
     sl := new(skipList)
     sl.head = new(skipListNode)
     sl.tail = new(skipListNode)
